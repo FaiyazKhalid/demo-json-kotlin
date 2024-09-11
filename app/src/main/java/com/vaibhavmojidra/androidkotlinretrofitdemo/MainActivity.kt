@@ -2,51 +2,56 @@ package com.vaibhavmojidra.androidkotlinretrofitdemo
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.liveData
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.vaibhavmojidra.androidkotlinretrofitdemo.databinding.ActivityMainBinding
+import kotlinx.coroutines.launch
 import retrofit2.Response
 
+
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+
+    private lateinit var textView: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding=DataBindingUtil.setContentView(this,R.layout.activity_main)
+        setContentView(R.layout.activity_main) // Replace with your activity layout resource ID
 
-        val retrofitService=RetrofitInstance.getRetrofitInstance().create(PostRetrofitService::class.java)
+        textView = findViewById(R.id.mainpage) // Replace with your TextView ID
 
+        // Fetch all posts asynchronously
+        lifecycleScope.launch {
+            val response = RetrofitInstance.getRetrofitInstance()
+                .create(PostRetrofitService::class.java)
+                .getPosts()
 
-
-        val responseLiveData:LiveData<Response<Posts>> = liveData {
-            //All
-            val response=retrofitService.getPosts()
-
-            //By UserId - Query Parameters
-            //val response=retrofitService.getPostsByUserId(3)
-            emit(response)
-        }
-        responseLiveData.observe(this) {
-            val postList = it.body()?.listIterator()
-            if (postList != null) {
-                while (postList.hasNext()) {
-                    val postItem = postList.next()
-                    val res=" Post UserId: ${postItem.userId}\n Post title: ${postItem.userId}\n Post body: ${postItem.body}\n\n"
-                    binding.textView.append(res)
-                }
+            if (response.isSuccessful) {
+                val posts = response.body() ?: return@launch // Handle empty response
+                displayPosts(posts)
+            } else {
+                // Handle network error
+                textView.text = "Error fetching posts"
             }
         }
+    }
 
-        val responseLiveData2:LiveData<Response<PostItem>> = liveData {
-            val response=retrofitService.getPostWithId(2)
-            emit(response)
+    private fun displayPosts(posts: List<PostItem>) {
+        val stringBuilder = StringBuilder()
+        for (post in posts) {
+            stringBuilder.append("Post ID: ${post.id}\n")
+            stringBuilder.append("Title: ${post.title}\n")
+            stringBuilder.append("Body: ${post.body}\n\n")
         }
-
-        responseLiveData2.observe(this){
-            val postItem=it.body()!!
-            Toast.makeText(MainActivity@this,"${postItem.title} \n ${postItem.body}",Toast.LENGTH_LONG).show()
-        }
+        textView.text = stringBuilder.toString()
     }
 }
